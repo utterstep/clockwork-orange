@@ -18,9 +18,9 @@ pub use self::redis::RedisStorage;
 #[derive(Debug, Clone, Hash, Eq, PartialEq)]
 pub struct Key(String);
 
-impl Into<Key> for String {
-    fn into(self) -> Key {
-        Key(self)
+impl From<String> for Key {
+    fn from(val: String) -> Key {
+        Key(val)
     }
 }
 
@@ -69,11 +69,11 @@ pub trait StorageBackend: Send + Sync + Clone + std::fmt::Debug {
     async fn delete(&mut self, key: &Key) -> Result<()>;
 
     async fn mark_as_read(&mut self, key: &Key) -> Result<()> {
-        let mut item = self.get(&key).await?;
+        let mut item = self.get(key).await?;
 
         if let Some(item) = &mut item {
             item.set_read(self.get_now().await?);
-            self.set(&key, item.clone()).await?;
+            self.set(key, item.clone()).await?;
         } else {
             return Err(eyre!("Item not found"));
         }
