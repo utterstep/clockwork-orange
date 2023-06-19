@@ -4,7 +4,7 @@ use clockwork_orange_messages::tg_escape;
 use color_eyre::Result;
 use teloxide::{
     requests::Requester,
-    types::{ChatAction, MediaText, Message, User},
+    types::{CallbackQuery, ChatAction, MediaText, Message, User},
 };
 
 use crate::{
@@ -65,6 +65,8 @@ pub async fn handle_command<B: StorageBackend + Debug>(
 
                 tokio::time::sleep(std::time::Duration::from_millis(250)).await;
             }
+
+            bot.send_message(chat_id, tg_escape("That's all!")).await?;
         }
         Command::Random => match storage.get_random().await {
             Ok(Some((key, item))) => {
@@ -107,10 +109,10 @@ pub async fn handle_command<B: StorageBackend + Debug>(
 pub async fn handle_callback<B: StorageBackend>(
     bot: Bot,
     mut storage: Storage<B>,
-    msg: Message,
+    callback_query: CallbackQuery,
     callback: Callback,
 ) -> Result<()> {
-    let chat_id = msg.chat.id;
+    let chat_id = callback_query.chat_instance;
 
     match callback {
         Callback::MarkAsRead(key) => {
@@ -120,6 +122,8 @@ pub async fn handle_callback<B: StorageBackend>(
                 .await?;
         }
     }
+
+    bot.answer_callback_query(&callback_query.id).await?;
 
     Ok(())
 }
