@@ -1,0 +1,14 @@
+# fly.toml app configuration file generated for clockwork-orange on 2023-06-12T21:10:23+04:00
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = "clockwork-orange"
+primary_region = "waw"
+
+[http_service]
+  internal_port = 8080
+  force_https = true
+  auto_stop_machines = true
+  auto_start_machines = true
+  min_machines_running = 1

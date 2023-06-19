@@ -1,0 +1,10 @@
+[workspace]
+members = [
+    "clockwork-orange",
+    "clockwork-orange-messages",
+]
+
+[workspace.package]
+name = "clockwork-orange"
+version = "0.1.0"
+authors = ["Vlad Stepanov <me@utterstep.dev>"]

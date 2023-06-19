@@ -1,0 +1,68 @@
+use teloxide::{
+    error_handlers::LoggingErrorHandler,
+    update_listeners::{
+        polling_default,
+        webhooks::{self, Options},
+    },
+};
+
+mod bot;
+mod config;
+mod content_item;
+mod storage;
+
+use crate::{
+    config::{BotMode, Config, StorageKind},
+    storage::{MemoryStorage, RedisStorage},
+};
+
+#[tokio::main]
+async fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+    pretty_env_logger::init();
+    dotenvy::dotenv().ok();
+
+    let config = Config::from_env()?;
+
+    let (bot, mut dispatcher) = match config.storage {
+        StorageKind::InMemory => {
+            let storage = MemoryStorage::new().into_storage();
+            bot::create_bot_and_dispatcher(storage, &config).await?
+        }
+        StorageKind::Redis => {
+            let redis_url = config.redis_url.as_ref().expect("REDIS_URL unspecified");
+            let storage = RedisStorage::new(redis_url).await?.into_storage();
+
+            bot::create_bot_and_dispatcher(storage, &config).await?
+        }
+    };
+
+    let error_handler = LoggingErrorHandler::new();
+
+    match config.bot_mode {
+        BotMode::Polling => {
+            let listener = polling_default(bot).await;
+
+            dispatcher
+                .dispatch_with_listener(listener, error_handler)
+                .await;
+        }
+        BotMode::Webhook => {
+            let listener = webhooks::axum(
+                bot,
+                Options::new(
+                    // FIXME: specify this in config
+                    "0.0.0.0:8080".parse().unwrap(),
+                    "https://clockwork.utterstep.app/webhooks/".parse().unwrap(),
+                ),
+            )
+            .await?;
+
+            dispatcher
+                .dispatch_with_listener(listener, error_handler)
+                .await;
+        }
+    }
+
+    Ok(())
+}
