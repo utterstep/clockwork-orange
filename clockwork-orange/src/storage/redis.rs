@@ -84,7 +84,7 @@ impl StorageBackend for RedisStorage {
         Ok(())
     }
 
-    async fn get_random(&self) -> Result<Option<ContentItem>> {
+    async fn get_random(&self) -> Result<Option<(Key, ContentItem)>> {
         let mut conn_manager = self.conn_manager.clone();
 
         let key: Option<String> = redis::cmd("RANDOMKEY")
@@ -94,7 +94,7 @@ impl StorageBackend for RedisStorage {
         if let Some(key) = key {
             let item: Option<Vec<u8>> = conn_manager.get(&key).await?;
             if let Some(item) = item {
-                return Ok(Some(deserialize(&item).unwrap()));
+                return Ok(Some((key.into(), deserialize(&item)?)));
             }
         }
 

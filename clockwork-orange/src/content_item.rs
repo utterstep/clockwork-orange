@@ -1,9 +1,6 @@
 use std::borrow::Borrow;
 
-use clockwork_orange_messages::tg_escape;
-use color_eyre::Result;
 use serde::{Deserialize, Serialize};
-use teloxide::{requests::Requester, types::ChatId};
 use time::OffsetDateTime;
 
 #[derive(Debug, PartialEq, Eq, Clone, Deserialize, Serialize)]
@@ -12,7 +9,7 @@ pub struct ContentItem {
     author: String,
     /// URL of an item
     content: String,
-    /// Whether the user has read the content item and when – in UTC
+    /// Whether the user has "read" the content item and when – in UTC
     read_at: Option<OffsetDateTime>,
 }
 
@@ -59,21 +56,12 @@ impl ContentItem {
 
 /// Methods for sending content items to chats
 impl ContentItem {
-    pub fn to_message_text(&self) -> String {
+    /// Convert the item to a Telegram message text, escaping special characters
+    pub fn to_tg_message_text(&self) -> String {
+        use clockwork_orange_messages::tg_escape;
+
         let text = format!("suggested by @{}:\n\n{}", self.author(), self.content());
 
         tg_escape(&text)
-    }
-
-    pub async fn send_to_chat<R>(&self, requester: R, chat_id: ChatId) -> Result<()>
-    where
-        R: Requester + Send + Sync,
-        <R as Requester>::Err: Send + Sync + 'static,
-    {
-        requester
-            .send_message(chat_id, self.to_message_text())
-            .await?;
-
-        Ok(())
     }
 }
