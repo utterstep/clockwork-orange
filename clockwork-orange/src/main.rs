@@ -6,15 +6,15 @@ use teloxide::{
     },
 };
 
-mod bot;
-mod config;
-mod content_item;
-mod storage;
-
 use crate::{
     config::{BotMode, Config, StorageKind},
     storage::{MemoryStorage, RedisStorage},
 };
+
+mod bot;
+mod config;
+mod content_item;
+mod storage;
 
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {

@@ -1,8 +1,7 @@
 use std::borrow::Borrow;
 
-use color_eyre::Result;
-
 use clockwork_orange_messages::tg_escape;
+use color_eyre::Result;
 use serde::{Deserialize, Serialize};
 use teloxide::{requests::Requester, types::ChatId};
 use time::OffsetDateTime;
@@ -38,6 +37,7 @@ impl ContentItem {
         &self.content
     }
 
+    #[allow(dead_code)]
     pub fn set_content(&mut self, content: impl Borrow<str>) {
         self.content = content.borrow().to_string();
     }
@@ -46,10 +46,12 @@ impl ContentItem {
         self.read_at.is_some()
     }
 
+    #[allow(dead_code)]
     pub fn set_read(&mut self, read_at: OffsetDateTime) {
         self.read_at.replace(read_at);
     }
 
+    #[allow(dead_code)]
     pub fn set_unread(&mut self) {
         self.read_at = None;
     }

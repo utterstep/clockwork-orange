@@ -1,12 +1,11 @@
 use std::fmt::Debug;
 
+use clockwork_orange_messages::tg_escape;
 use color_eyre::Result;
 use teloxide::{
     requests::Requester,
     types::{ChatAction, MediaText, Message, User},
 };
-
-use clockwork_orange_messages::tg_escape;
 
 use crate::{
     content_item::ContentItem,
