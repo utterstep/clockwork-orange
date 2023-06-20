@@ -52,8 +52,6 @@ pub fn tg_escape(text: &str) -> String {
     let mut inside_code = false;
 
     let parser = Parser::new_ext(text, options).map(|event| {
-        dbg!(&event);
-
         match &event {
             Event::Start(Tag::CodeBlock(_)) => {
                 inside_code = true;
@@ -74,7 +72,6 @@ pub fn tg_escape(text: &str) -> String {
 
                 // manual COW implementation...
                 let replaced = re.replace_all(text, "\\$0");
-                dbg!(&replaced);
                 match replaced {
                     Cow::Borrowed(_) => event,
                     Cow::Owned(text) => match event {
