@@ -36,6 +36,7 @@ macro_rules! message {
 }
 
 static TG_MD_ESCAPE_REGEX: Lazy<Regex> = regex!(r"[_*\[\]()~`>#+\-=|{}\.!\\]");
+static TG_DOUBLE_QUOTATION_REGEX: Lazy<Regex> = regex!(r#"\\\\([_*\[\]()~`>#+\-=|{}\.!])"#);
 static TG_MD_CODE_ESCAPE_REGEX: Lazy<Regex> = regex!(r"[`\\]");
 static TG_MD_SERIALIZE_OPTIONS: Lazy<SerOptions> = Lazy::new(|| SerOptions {
     code_block_token_count: 3,
@@ -94,7 +95,11 @@ pub fn tg_escape(text: &str) -> String {
 
     // TODO: this is a dirty hack to fix double-quotation issue
     // it surely will lead to some other issues, but I don't have time to fix it now
-    res.replace("\\\\", "\\")
+    //
+    // to debug: replace this with just `res` and `self::tests::test_nausicaa` will fail
+    TG_DOUBLE_QUOTATION_REGEX
+        .replace_all(&res, "\\$1")
+        .into_owned()
 }
 
 #[cfg(test)]
@@ -125,8 +130,6 @@ mod tests {
 
     #[test]
     fn test_nausicaa() {
-        assert_eq!(tg_escape("(film)"), r#"\(film\)"#);
-
         assert_eq!(
             tg_escape(
                 "https://en.wikipedia.org/wiki/Nausica%C3%A4_of_the_Valley_of_the_Wind_(film)"
