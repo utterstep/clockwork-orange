@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use once_cell::sync::Lazy;
 use pulldown_cmark::{Event, Options as DeOptions, Parser, Tag};
 use pulldown_cmark_to_cmark::Options as SerOptions;
-use regex::{Captures, Regex};
+use regex::Regex;
 
 macro_rules! regex {
     ($re:literal $(,)?) => {
@@ -72,10 +72,7 @@ pub fn tg_escape(text: &str) -> String {
                 };
 
                 // manual COW implementation...
-                let replaced = re.replace_all(text, |caps: &Captures| {
-                    dbg!(&caps);
-                    format!("\x5C{}", &caps[0])
-                });
+                let replaced = re.replace_all(text, "\\$0");
                 dbg!(&replaced);
                 match replaced {
                     Cow::Borrowed(_) => event,
@@ -95,7 +92,9 @@ pub fn tg_escape(text: &str) -> String {
     pulldown_cmark_to_cmark::cmark_with_options(parser, &mut res, TG_MD_SERIALIZE_OPTIONS.clone())
         .expect("writing to string failed!");
 
-    res
+    // TODO: this is a dirty hack to fix double-quotation issue
+    // it surely will lead to some other issues, but I don't have time to fix it now
+    res.replace("\\\\", "\\")
 }
 
 #[cfg(test)]
@@ -125,8 +124,9 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Need to debug this double-quotation issue"]
     fn test_nausicaa() {
+        assert_eq!(tg_escape("(film)"), r#"\(film\)"#);
+
         assert_eq!(
             tg_escape(
                 "https://en.wikipedia.org/wiki/Nausica%C3%A4_of_the_Valley_of_the_Wind_(film)"
