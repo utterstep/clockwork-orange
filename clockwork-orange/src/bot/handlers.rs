@@ -1,10 +1,10 @@
 use std::fmt::Debug;
 
 use clockwork_orange_messages::tg_escape;
-use color_eyre::Result;
+use color_eyre::{eyre::eyre, Result};
 use teloxide::{
     requests::Requester,
-    types::{CallbackQuery, ChatAction, MediaText, Message, User},
+    types::{CallbackQuery, ChatAction, MediaText, Message, Update, User},
 };
 
 use crate::{
@@ -109,10 +109,11 @@ pub async fn handle_command<B: StorageBackend + Debug>(
 pub async fn handle_callback<B: StorageBackend>(
     bot: Bot,
     mut storage: Storage<B>,
+    update: Update,
     callback_query: CallbackQuery,
     callback: Callback,
 ) -> Result<()> {
-    let chat_id = callback_query.chat_instance;
+    let chat_id = update.chat().ok_or_else(|| eyre!("No chat in update"))?.id;
 
     match callback {
         Callback::MarkAsRead(key) => {
