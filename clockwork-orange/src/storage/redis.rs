@@ -27,12 +27,32 @@ impl RedisStorage {
     pub fn into_storage(self) -> super::Storage<Self> {
         super::Storage { backend: self }
     }
+
+    /// Method do get live redis connection.
+    /// If connection is not available, it will try to reconnect once.
+    /// If it fails again, it will return the error.
+    ///
+    /// TODO: disallow using `self.conn_manager` directly on typesystem level
+    async fn connection(&self) -> Result<ConnectionManager> {
+        let mut conn_manager = self.conn_manager.clone();
+
+        match redis::cmd("PING").query_async(&mut conn_manager).await {
+            Ok(()) => {}
+            Err(_) => {
+                // wait once for reconnection
+                // if it fails again, return the error
+                redis::cmd("PING").query_async(&mut conn_manager).await?;
+            }
+        }
+
+        Ok(conn_manager)
+    }
 }
 
 #[async_trait::async_trait]
 impl StorageBackend for RedisStorage {
     async fn get(&self, key: &Key) -> Result<Option<ContentItem>> {
-        let mut conn_manager = self.conn_manager.clone();
+        let mut conn_manager = self.connection().await?;
 
         let item: Option<Vec<u8>> = conn_manager.get(key.as_ref()).await?;
         Ok(item.map(|item| deserialize(&item).unwrap()))
@@ -45,7 +65,7 @@ impl StorageBackend for RedisStorage {
     }
 
     async fn get_all(&self) -> Result<std::collections::HashMap<Key, ContentItem>> {
-        let mut conn_manager = self.conn_manager.clone();
+        let mut conn_manager = self.connection().await?;
 
         let keys: Vec<String> = conn_manager.keys("*").await?;
         let mut items = std::collections::HashMap::new();
@@ -70,22 +90,23 @@ impl StorageBackend for RedisStorage {
     }
 
     async fn get_now(&self) -> Result<time::OffsetDateTime> {
-        let conn_manager = self.conn_manager.clone();
+        let mut conn_manager = self.connection().await?;
 
-        let (seconds, _usecs): (i64, i64) = redis::cmd("TIME")
-            .query_async(&mut conn_manager.clone())
-            .await?;
+        let (seconds, _usecs): (i64, i64) =
+            redis::cmd("TIME").query_async(&mut conn_manager).await?;
 
         Ok(time::OffsetDateTime::from_unix_timestamp(seconds)?)
     }
 
     async fn delete(&mut self, key: &Key) -> Result<()> {
-        self.conn_manager.del(key.as_ref()).await?;
+        let mut conn_manager = self.connection().await?;
+
+        conn_manager.del(key.as_ref()).await?;
         Ok(())
     }
 
     async fn get_random(&self) -> Result<Option<(Key, ContentItem)>> {
-        let mut conn_manager = self.conn_manager.clone();
+        let mut conn_manager = self.connection().await?;
 
         let key: Option<String> = redis::cmd("RANDOMKEY")
             .query_async(&mut conn_manager)
