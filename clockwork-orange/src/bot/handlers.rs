@@ -1,10 +1,10 @@
 use std::fmt::Debug;
 
 use clockwork_orange_messages::tg_escape;
-use color_eyre::Result;
+use color_eyre::{eyre::eyre, Result};
 use teloxide::{
     requests::Requester,
-    types::{ChatAction, MediaText, Message, User},
+    types::{CallbackQuery, ChatAction, MediaText, Message, Update, User},
 };
 
 use crate::{
@@ -12,7 +12,7 @@ use crate::{
     storage::{Storage, StorageBackend},
 };
 
-use super::{Bot, Command};
+use super::{callbacks::Callback, send_item_to_chat, Bot, Command};
 
 pub async fn handle_command<B: StorageBackend + Debug>(
     bot: Bot,
@@ -59,16 +59,18 @@ pub async fn handle_command<B: StorageBackend + Debug>(
                 return Ok(());
             }
 
-            for item in items.values() {
-                item.send_to_chat(&bot, chat_id).await?;
+            for (key, item) in items.iter() {
+                send_item_to_chat(&bot, item, key, chat_id).await?;
                 bot.send_chat_action(chat_id, ChatAction::Typing).await?;
 
                 tokio::time::sleep(std::time::Duration::from_millis(250)).await;
             }
+
+            bot.send_message(chat_id, tg_escape("That's all!")).await?;
         }
         Command::Random => match storage.get_random().await {
-            Ok(Some(item)) => {
-                item.send_to_chat(&bot, chat_id).await?;
+            Ok(Some((key, item))) => {
+                send_item_to_chat(&bot, &item, &key, chat_id).await?;
                 bot.send_chat_action(chat_id, ChatAction::Typing).await?;
             }
             Ok(None) => {
@@ -90,8 +92,8 @@ pub async fn handle_command<B: StorageBackend + Debug>(
                 return Ok(());
             }
 
-            for item in items.values() {
-                item.send_to_chat(&bot, chat_id).await?;
+            for (key, item) in items.iter() {
+                send_item_to_chat(&bot, item, key, chat_id).await?;
                 bot.send_chat_action(chat_id, ChatAction::Typing).await?;
 
                 tokio::time::sleep(std::time::Duration::from_millis(250)).await;
@@ -104,7 +106,30 @@ pub async fn handle_command<B: StorageBackend + Debug>(
     Ok(())
 }
 
-pub async fn add_new_entry<B: StorageBackend + Debug>(
+pub async fn handle_callback<B: StorageBackend>(
+    bot: Bot,
+    mut storage: Storage<B>,
+    update: Update,
+    callback_query: CallbackQuery,
+    callback: Callback,
+) -> Result<()> {
+    let chat_id = update.chat().ok_or_else(|| eyre!("No chat in update"))?.id;
+
+    match callback {
+        Callback::MarkAsRead(key) => {
+            storage.mark_as_read(&key).await?;
+
+            bot.send_message(chat_id, tg_escape("Marked as read! I hope you liked it 😊"))
+                .await?;
+        }
+    }
+
+    bot.answer_callback_query(&callback_query.id).await?;
+
+    Ok(())
+}
+
+pub async fn add_new_entry<B: StorageBackend>(
     bot: Bot,
     mut storage: Storage<B>,
     msg: Message,

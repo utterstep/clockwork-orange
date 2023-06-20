@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use once_cell::sync::Lazy;
 use pulldown_cmark::{Event, Options as DeOptions, Parser, Tag};
 use pulldown_cmark_to_cmark::Options as SerOptions;
-use regex::Regex;
+use regex::{Captures, Regex};
 
 macro_rules! regex {
     ($re:literal $(,)?) => {
@@ -51,6 +51,8 @@ pub fn tg_escape(text: &str) -> String {
     let mut inside_code = false;
 
     let parser = Parser::new_ext(text, options).map(|event| {
+        dbg!(&event);
+
         match &event {
             Event::Start(Tag::CodeBlock(_)) => {
                 inside_code = true;
@@ -70,7 +72,11 @@ pub fn tg_escape(text: &str) -> String {
                 };
 
                 // manual COW implementation...
-                let replaced = re.replace_all(text, "\\$0");
+                let replaced = re.replace_all(text, |caps: &Captures| {
+                    dbg!(&caps);
+                    format!("\x5C{}", &caps[0])
+                });
+                dbg!(&replaced);
                 match replaced {
                     Cow::Borrowed(_) => event,
                     Cow::Owned(text) => match event {
@@ -115,6 +121,17 @@ mod tests {
         assert_eq!(
             tg_escape("Скоро тебе придёт статистика за сегодня, а в целом – доступную стату можно посмотреть по запросу /get_stat :)"),
             r#"Скоро тебе придёт статистика за сегодня, а в целом – доступную стату можно посмотреть по запросу /get\_stat :\)"#
-        )
+        );
+    }
+
+    #[test]
+    #[ignore = "Need to debug this double-quotation issue"]
+    fn test_nausicaa() {
+        assert_eq!(
+            tg_escape(
+                "https://en.wikipedia.org/wiki/Nausica%C3%A4_of_the_Valley_of_the_Wind_(film)"
+            ),
+            r#"https://en\.wikipedia\.org/wiki/Nausica%C3%A4\_of\_the\_Valley\_of\_the\_Wind\_\(film\)"#
+        );
     }
 }

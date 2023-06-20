@@ -52,11 +52,19 @@ impl<B: StorageBackend> DerefMut for Storage<B> {
 #[async_trait::async_trait]
 /// Basic storage trait, all methods, except `get` should return only unread items
 pub trait StorageBackend: Send + Sync + Clone + std::fmt::Debug {
+    /// Set item to storage
     async fn set(&mut self, key: &Key, value: ContentItem) -> Result<()>;
+
+    /// Get specific item from storage
+    ///
+    /// # Caution
+    /// May return read items
     async fn get(&self, key: &Key) -> Result<Option<ContentItem>>;
 
+    /// Get all items from storage, filtering unread ones
     async fn get_all(&self) -> Result<HashMap<Key, ContentItem>>;
 
+    /// Get items which this user has added
     async fn get_user_items(&self, user: &str) -> Result<HashMap<Key, ContentItem>> {
         let mut map = self.get_all().await?;
         map.retain(|_, item| item.author() == user);
@@ -64,10 +72,14 @@ pub trait StorageBackend: Send + Sync + Clone + std::fmt::Debug {
         Ok(map)
     }
 
+    /// Get current time – we try to connect to external state
+    /// through Storage trait whenever possible
     async fn get_now(&self) -> Result<OffsetDateTime>;
 
+    /// Delete item from storage – unused currently
     async fn delete(&mut self, key: &Key) -> Result<()>;
 
+    /// Mark item as "read" – user has seen it and wants to remove it from his queue
     async fn mark_as_read(&mut self, key: &Key) -> Result<()> {
         let mut item = self.get(key).await?;
 
@@ -81,7 +93,8 @@ pub trait StorageBackend: Send + Sync + Clone + std::fmt::Debug {
         Ok(())
     }
 
-    async fn get_random(&self) -> Result<Option<ContentItem>> {
+    /// Get random unread item from storage
+    async fn get_random(&self) -> Result<Option<(Key, ContentItem)>> {
         let items = self.get_all().await?;
         let mut rng = rand::thread_rng();
         if items.is_empty() {
@@ -89,10 +102,10 @@ pub trait StorageBackend: Send + Sync + Clone + std::fmt::Debug {
         }
         let index = rng.gen_range(0..items.len());
 
-        let item = items
-            .values()
+        let (key, item) = items
+            .iter()
             .nth(index)
             .expect("this should never happen, but it did");
-        Ok(Some(item.clone()))
+        Ok(Some((key.clone(), item.clone())))
     }
 }

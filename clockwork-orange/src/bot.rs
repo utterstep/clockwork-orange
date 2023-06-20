@@ -4,17 +4,22 @@ use color_eyre::{Report, Result};
 use teloxide::{
     adaptors::DefaultParseMode,
     dispatching::{DefaultKey, HandlerExt, UpdateFilterExt},
+    payloads::SendMessageSetters,
     prelude::Dispatcher as TgDispatcher,
     requests::{Requester, RequesterExt},
-    types::{ParseMode, Update},
+    types::{ChatId, InlineKeyboardMarkup, ParseMode, Update},
     utils::command::BotCommands,
     Bot as TgBot,
 };
 
 use crate::{
     config::Config,
-    storage::{Storage, StorageBackend},
+    content_item::ContentItem,
+    storage::{Key, Storage, StorageBackend},
 };
+
+mod callbacks;
+use callbacks::Callback;
 
 mod commands;
 use commands::Command;
@@ -50,6 +55,12 @@ pub async fn create_bot_and_dispatcher<B: StorageBackend + Debug + 'static>(
                     .endpoint(handle_command::<B>),
             ),
         )
+        // generic Callback handler
+        .branch(
+            Update::filter_callback_query()
+                .filter_map(extractors::get_callback_data)
+                .endpoint(handlers::handle_callback::<B>),
+        )
         // any other text message – append to diary
         .branch(
             Update::filter_message()
@@ -65,4 +76,25 @@ pub async fn create_bot_and_dispatcher<B: StorageBackend + Debug + 'static>(
             .enable_ctrlc_handler()
             .build(),
     ))
+}
+
+/// Send a message to chat, with a button to mark the item as watched
+pub(self) async fn send_item_to_chat<R>(
+    requester: R,
+    item: &ContentItem,
+    key: &Key,
+    chat_id: ChatId,
+) -> Result<()>
+where
+    R: Requester + Send + Sync,
+    <R as Requester>::Err: Send + Sync + 'static,
+{
+    requester
+        .send_message(chat_id, item.to_tg_message_text())
+        .reply_markup(InlineKeyboardMarkup::new(vec![vec![
+            Callback::mark_as_read(key).as_button("☑️ Mark as watched"),
+        ]]))
+        .await?;
+
+    Ok(())
 }
