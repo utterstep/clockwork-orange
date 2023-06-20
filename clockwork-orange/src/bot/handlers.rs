@@ -60,30 +60,33 @@ pub async fn handle_command<B: StorageBackend + Debug>(
             }
 
             for (key, item) in items.iter() {
-                send_item_to_chat(&bot, item, key, chat_id).await?;
                 bot.send_chat_action(chat_id, ChatAction::Typing).await?;
+                send_item_to_chat(&bot, item, key, chat_id).await?;
 
                 tokio::time::sleep(std::time::Duration::from_millis(250)).await;
             }
 
             bot.send_message(chat_id, tg_escape("That's all!")).await?;
         }
-        Command::Random => match storage.get_random().await {
-            Ok(Some((key, item))) => {
-                send_item_to_chat(&bot, &item, &key, chat_id).await?;
-                bot.send_chat_action(chat_id, ChatAction::Typing).await?;
+        Command::Random => {
+            bot.send_chat_action(chat_id, ChatAction::Typing).await?;
+
+            match storage.get_random().await {
+                Ok(Some((key, item))) => {
+                    send_item_to_chat(&bot, &item, &key, chat_id).await?;
+                }
+                Ok(None) => {
+                    bot.send_message(chat_id, "You have no entries yet").await?;
+                }
+                Err(e) => {
+                    bot.send_message(
+                        chat_id,
+                        tg_escape(&format!("Some error happened :(\n\ndebug info:\n```{e}```")),
+                    )
+                    .await?;
+                }
             }
-            Ok(None) => {
-                bot.send_message(chat_id, "You have no entries yet").await?;
-            }
-            Err(e) => {
-                bot.send_message(
-                    chat_id,
-                    tg_escape(&format!("Some error happened :(\n\ndebug info:\n```{e}```")),
-                )
-                .await?;
-            }
-        },
+        }
         Command::Unread => {
             let items = storage.get_all().await?;
 
@@ -93,8 +96,8 @@ pub async fn handle_command<B: StorageBackend + Debug>(
             }
 
             for (key, item) in items.iter() {
-                send_item_to_chat(&bot, item, key, chat_id).await?;
                 bot.send_chat_action(chat_id, ChatAction::Typing).await?;
+                send_item_to_chat(&bot, item, key, chat_id).await?;
 
                 tokio::time::sleep(std::time::Duration::from_millis(250)).await;
             }
