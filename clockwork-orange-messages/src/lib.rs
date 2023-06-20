@@ -3,7 +3,7 @@ use std::borrow::Cow;
 use once_cell::sync::Lazy;
 use pulldown_cmark::{Event, Options as DeOptions, Parser, Tag};
 use pulldown_cmark_to_cmark::Options as SerOptions;
-use regex::{Captures, Regex};
+use regex::Regex;
 
 macro_rules! regex {
     ($re:literal $(,)?) => {
@@ -36,6 +36,7 @@ macro_rules! message {
 }
 
 static TG_MD_ESCAPE_REGEX: Lazy<Regex> = regex!(r"[_*\[\]()~`>#+\-=|{}\.!\\]");
+static TG_DOUBLE_QUOTATION_REGEX: Lazy<Regex> = regex!(r#"\\\\([_*\[\]()~`>#+\-=|{}\.!])"#);
 static TG_MD_CODE_ESCAPE_REGEX: Lazy<Regex> = regex!(r"[`\\]");
 static TG_MD_SERIALIZE_OPTIONS: Lazy<SerOptions> = Lazy::new(|| SerOptions {
     code_block_token_count: 3,
@@ -72,10 +73,7 @@ pub fn tg_escape(text: &str) -> String {
                 };
 
                 // manual COW implementation...
-                let replaced = re.replace_all(text, |caps: &Captures| {
-                    dbg!(&caps);
-                    format!("\x5C{}", &caps[0])
-                });
+                let replaced = re.replace_all(text, "\\$0");
                 dbg!(&replaced);
                 match replaced {
                     Cow::Borrowed(_) => event,
@@ -95,7 +93,13 @@ pub fn tg_escape(text: &str) -> String {
     pulldown_cmark_to_cmark::cmark_with_options(parser, &mut res, TG_MD_SERIALIZE_OPTIONS.clone())
         .expect("writing to string failed!");
 
-    res
+    // TODO: this is a dirty hack to fix double-quotation issue
+    // it surely will lead to some other issues, but I don't have time to fix it now
+    //
+    // to debug: replace this with just `res` and `self::tests::test_nausicaa` will fail
+    TG_DOUBLE_QUOTATION_REGEX
+        .replace_all(&res, "\\$1")
+        .into_owned()
 }
 
 #[cfg(test)]
@@ -125,7 +129,6 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "Need to debug this double-quotation issue"]
     fn test_nausicaa() {
         assert_eq!(
             tg_escape(
