@@ -15,8 +15,10 @@ dotenvy = "0.15.7"
 dptree = "0.3.0"
 envy = "0.4.2"
 indoc = "2.0.1"
+log = "0.4.19"
 pretty_env_logger = "0.5.0"
 rand = "0.8.5"
+redis = { version = "0.23.0", default-features = false, features = ["acl", "aio", "tokio-comp"] }
 serde = { version = "1.0.164", features = ["derive"] }
 teloxide = { version = "0.12.2", default-features = false, features = ["auto-send", "ctrlc_handler", "rustls", "macros", "webhooks-axum", "throttle"] }
 time = { version = "0.3.22", features = ["serde"] }
@@ -24,4 +26,3 @@ tokio = { version = "1.28.2", features = ["full"] }
 url = { version = "2.4.0", features = ["serde"] }
 
 clockwork-orange-messages = { path = "../clockwork-orange-messages" }
-redis = { version = "0.23.0", default-features = false, features = ["acl", "aio", "r2d2", "connection-manager", "tokio-comp"] }

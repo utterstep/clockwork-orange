@@ -1,6 +1,6 @@
 use std::fmt::Debug;
 
-use color_eyre::{Report, Result};
+use color_eyre::{eyre::WrapErr, Report, Result};
 use teloxide::{
     adaptors::DefaultParseMode,
     dispatching::{DefaultKey, HandlerExt, UpdateFilterExt},
@@ -89,12 +89,15 @@ where
     R: Requester + Send + Sync,
     <R as Requester>::Err: Send + Sync + 'static,
 {
+    let message_text = item.to_tg_message_text();
+
     requester
-        .send_message(chat_id, item.to_tg_message_text())
+        .send_message(chat_id, &message_text)
         .reply_markup(InlineKeyboardMarkup::new(vec![vec![
             Callback::mark_as_read(key).as_button("☑️ Mark as watched"),
         ]]))
-        .await?;
+        .await
+        .wrap_err_with(|| format!("Failed to send a message to chat, message: {message_text}"))?;
 
     Ok(())
 }
