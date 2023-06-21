@@ -1,3 +1,4 @@
+use log::{debug, info};
 use teloxide::{
     error_handlers::LoggingErrorHandler,
     update_listeners::{
@@ -26,21 +27,25 @@ async fn main() -> color_eyre::Result<()> {
 
     let (bot, mut dispatcher) = match config.storage {
         StorageKind::InMemory => {
+            info!("Creating bot with in-memory storage");
             let storage = MemoryStorage::new().into_storage();
             bot::create_bot_and_dispatcher(storage, &config).await?
         }
         StorageKind::Redis => {
+            info!("Creating bot with redis storage");
             let redis_url = config.redis_url.as_ref().expect("REDIS_URL unspecified");
             let storage = RedisStorage::new(redis_url).await?.into_storage();
 
             bot::create_bot_and_dispatcher(storage, &config).await?
         }
     };
+    debug!("Bot created");
 
     let error_handler = LoggingErrorHandler::new();
 
     match config.bot_mode {
         BotMode::Polling => {
+            info!("Starting bot in polling mode");
             let listener = polling_default(bot).await;
 
             dispatcher
@@ -48,6 +53,7 @@ async fn main() -> color_eyre::Result<()> {
                 .await;
         }
         BotMode::Webhook => {
+            info!("Starting bot in webhook mode");
             let listener = webhooks::axum(
                 bot,
                 Options::new(

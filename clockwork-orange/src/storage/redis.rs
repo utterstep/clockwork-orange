@@ -1,14 +1,16 @@
-use std::fmt;
+use std::{fmt, time::Duration};
 
 use bincode::{deserialize, serialize};
-use color_eyre::Result;
-use redis::{aio::ConnectionManager, AsyncCommands, Client};
+use color_eyre::{eyre::WrapErr, Result};
+use log::{debug, info};
+use redis::{aio::Connection, AsyncCommands, Client};
+use tokio::time::timeout;
 
 use super::{ContentItem, Key, StorageBackend};
 
 #[derive(Clone)]
 pub struct RedisStorage {
-    conn_manager: ConnectionManager,
+    client: Client,
 }
 
 impl fmt::Debug for RedisStorage {
@@ -19,9 +21,9 @@ impl fmt::Debug for RedisStorage {
 
 impl RedisStorage {
     pub async fn new(url: &str) -> Result<Self> {
-        let client = Client::open(url).unwrap();
-        let conn_manager = client.get_tokio_connection_manager().await?;
-        Ok(Self { conn_manager })
+        let client = Client::open(url)?;
+
+        Ok(Self { client })
     }
 
     pub fn into_storage(self) -> super::Storage<Self> {
@@ -29,50 +31,58 @@ impl RedisStorage {
     }
 
     /// Method do get live redis connection.
-    /// If connection is not available, it will try to reconnect once.
-    /// If it fails again, it will return the error.
     ///
-    /// TODO: disallow using `self.conn_manager` directly on typesystem level
-    async fn connection(&self) -> Result<ConnectionManager> {
-        let mut conn_manager = self.conn_manager.clone();
+    /// Currently creates new connection every time.
+    /// Huge performance impact, but for current state of having only 2 (two) users
+    /// – that's probably fine :)
+    async fn connection(&self) -> Result<Connection> {
+        info!("Getting redis connection");
 
-        match redis::cmd("PING").query_async(&mut conn_manager).await {
-            Ok(()) => {}
-            Err(_) => {
-                // wait once for reconnection
-                // if it fails again, return the error
-                redis::cmd("PING").query_async(&mut conn_manager).await?;
-            }
-        }
+        let connection = timeout(
+            Duration::from_millis(1500),
+            self.client.get_tokio_connection(),
+        )
+        .await
+        .wrap_err("connection didn't established before timeout")?
+        .wrap_err("Redis connection error")?;
 
-        Ok(conn_manager)
+        info!("Got redis connection");
+
+        Ok(connection)
     }
 }
 
 #[async_trait::async_trait]
 impl StorageBackend for RedisStorage {
     async fn get(&self, key: &Key) -> Result<Option<ContentItem>> {
-        let mut conn_manager = self.connection().await?;
+        let mut connection = self.connection().await?;
 
-        let item: Option<Vec<u8>> = conn_manager.get(key.as_ref()).await?;
-        Ok(item.map(|item| deserialize(&item).unwrap()))
+        let item: Option<Vec<u8>> = connection.get(key.as_ref()).await?;
+        Ok(item
+            .map(|item| deserialize(&item).wrap_err("failed to deserialize item in `get`"))
+            .transpose()?)
     }
 
     async fn set(&mut self, key: &Key, value: ContentItem) -> Result<()> {
+        let mut connection = self.connection().await?;
+
         let item = serialize(&value).unwrap();
-        self.conn_manager.set(key.as_ref(), item).await?;
+        connection.set(key.as_ref(), item).await?;
         Ok(())
     }
 
     async fn get_all(&self) -> Result<std::collections::HashMap<Key, ContentItem>> {
-        let mut conn_manager = self.connection().await?;
+        let mut connection = self.connection().await?;
 
-        let keys: Vec<String> = conn_manager.keys("*").await?;
+        let keys: Vec<String> = connection.keys("*").await?;
         let mut items = std::collections::HashMap::new();
         for key in keys {
-            let item: Option<Vec<u8>> = conn_manager.get(&key).await?;
+            let item: Option<Vec<u8>> = connection.get(&key).await?;
             if let Some(item) = item {
-                items.insert(Key(key), deserialize(&item).unwrap());
+                items.insert(
+                    Key(key),
+                    deserialize(&item).wrap_err("failed to deserialize item in `get_all`")?,
+                );
             }
         }
         Ok(items)
@@ -90,32 +100,46 @@ impl StorageBackend for RedisStorage {
     }
 
     async fn get_now(&self) -> Result<time::OffsetDateTime> {
-        let mut conn_manager = self.connection().await?;
+        let mut connection = self.connection().await?;
 
-        let (seconds, _usecs): (i64, i64) =
-            redis::cmd("TIME").query_async(&mut conn_manager).await?;
+        let (seconds, _usecs): (i64, i64) = redis::cmd("TIME")
+            .query_async(&mut connection)
+            .await
+            .wrap_err("failed to get time from Redis")?;
 
         Ok(time::OffsetDateTime::from_unix_timestamp(seconds)?)
     }
 
     async fn delete(&mut self, key: &Key) -> Result<()> {
-        let mut conn_manager = self.connection().await?;
+        let mut connection = self.connection().await?;
 
-        conn_manager.del(key.as_ref()).await?;
+        connection
+            .del(key.as_ref())
+            .await
+            .wrap_err_with(|| format!("failed to delete item by key {key:?}"))?;
         Ok(())
     }
 
     async fn get_random(&self) -> Result<Option<(Key, ContentItem)>> {
-        let mut conn_manager = self.connection().await?;
+        let mut connection = self.connection().await?;
 
         let key: Option<String> = redis::cmd("RANDOMKEY")
-            .query_async(&mut conn_manager)
-            .await?;
+            .query_async(&mut connection)
+            .await
+            .wrap_err("failed to get random key from Redis")?;
+
+        debug!("got following random key: {key:?}");
 
         if let Some(key) = key {
-            let item: Option<Vec<u8>> = conn_manager.get(&key).await?;
+            let item: Option<Vec<u8>> = connection
+                .get(&key)
+                .await
+                .wrap_err_with(|| format!("random key {key:?} doesn't exist!"))?;
             if let Some(item) = item {
-                return Ok(Some((key.into(), deserialize(&item)?)));
+                return Ok(Some((
+                    key.into(),
+                    deserialize(&item).wrap_err("failed to deserialize item in `get_random`")?,
+                )));
             }
         }
 

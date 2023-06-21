@@ -1,3 +1,4 @@
+use log::debug;
 use teloxide::types::InlineKeyboardButton;
 
 use crate::storage::Key;
@@ -46,6 +47,7 @@ impl Callback {
 
     /// Create callback from TG CallbackQuery payload
     pub fn from_payload(payload: &str) -> Option<Self> {
+        debug!("got callback with payload: {payload}");
         let (kind, data) = payload.split_once(':')?;
 
         match kind {
