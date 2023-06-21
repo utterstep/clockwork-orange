@@ -1,3 +1,9 @@
+//! Redis storage backend.
+//!
+//! I've chosen Redis as a storage backend because it's provided free with Fly.io :)
+//! It'd be much easier to use something more relational, like Postgres,
+//! but I don't want to pay for it currently.
+
 use std::{fmt, time::Duration};
 
 use bincode::{deserialize, serialize};
@@ -79,10 +85,14 @@ impl StorageBackend for RedisStorage {
         for key in keys {
             let item: Option<Vec<u8>> = connection.get(&key).await?;
             if let Some(item) = item {
-                items.insert(
-                    Key(key),
-                    deserialize(&item).wrap_err("failed to deserialize item in `get_all`")?,
-                );
+                let item: ContentItem =
+                    deserialize(&item).wrap_err("failed to deserialize item in `get_all`")?;
+
+                if item.is_read() {
+                    continue;
+                }
+
+                items.insert(Key(key), item);
             }
         }
         Ok(items)
@@ -123,26 +133,33 @@ impl StorageBackend for RedisStorage {
     async fn get_random(&self) -> Result<Option<(Key, ContentItem)>> {
         let mut connection = self.connection().await?;
 
-        let key: Option<String> = redis::cmd("RANDOMKEY")
-            .query_async(&mut connection)
-            .await
-            .wrap_err("failed to get random key from Redis")?;
-
-        debug!("got following random key: {key:?}");
-
-        if let Some(key) = key {
-            let item: Option<Vec<u8>> = connection
-                .get(&key)
+        // TODO: this will be slow as hell when we'll have a lot of read items
+        loop {
+            let key: Option<String> = redis::cmd("RANDOMKEY")
+                .query_async(&mut connection)
                 .await
-                .wrap_err_with(|| format!("random key {key:?} doesn't exist!"))?;
-            if let Some(item) = item {
-                return Ok(Some((
-                    key.into(),
-                    deserialize(&item).wrap_err("failed to deserialize item in `get_random`")?,
-                )));
+                .wrap_err("failed to get random key from Redis")?;
+
+            debug!("got following random key: {key:?}");
+
+            if let Some(key) = key {
+                let item: Option<Vec<u8>> = connection
+                    .get(&key)
+                    .await
+                    .wrap_err_with(|| format!("random key {key:?} doesn't exist!"))?;
+                if let Some(item) = item {
+                    let item: ContentItem = deserialize(&item)
+                        .wrap_err("failed to deserialize item in `get_random`")?;
+
+                    if item.is_read() {
+                        continue;
+                    }
+
+                    return Ok(Some((key.into(), item)));
+                }
+            } else {
+                return Ok(None);
             }
         }
-
-        Ok(None)
     }
 }
