@@ -3,6 +3,8 @@
 //! I've chosen Redis as a storage backend because it's provided free with Fly.io :)
 //! It'd be much easier to use something more relational, like Postgres,
 //! but I don't want to pay for it currently.
+//!
+//! TODO: think about [Neon](https://neon.tech) as a solution for Postgres.
 
 use std::{fmt, time::Duration};
 
@@ -40,7 +42,7 @@ impl RedisStorage {
     ///
     /// Currently creates new connection every time.
     /// Huge performance impact, but for current state of having only 2 (two) users
-    /// – that's probably fine :)
+    /// that's probably fine :)
     async fn connection(&self) -> Result<Connection> {
         info!("Getting redis connection");
 
