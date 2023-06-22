@@ -9,7 +9,10 @@
 use std::{fmt, time::Duration};
 
 use bincode::{deserialize, serialize};
-use color_eyre::{eyre::WrapErr, Result};
+use color_eyre::{
+    eyre::{eyre, WrapErr},
+    Result,
+};
 use log::{debug, info};
 use redis::{aio::Connection, AsyncCommands, Client};
 use tokio::time::timeout;
@@ -65,7 +68,11 @@ impl StorageBackend for RedisStorage {
     async fn get(&self, key: &Key) -> Result<Option<ContentItem>> {
         let mut connection = self.connection().await?;
 
-        let item: Option<Vec<u8>> = connection.get(key.as_ref()).await?;
+        let item: Option<Vec<u8>> = connection
+            .get(key.as_ref())
+            .await
+            .wrap_err_with(|| format!("failed to get item from Redis by key `{key:?}`"))?;
+
         Ok(item
             .map(|item| deserialize(&item).wrap_err("failed to deserialize item in `get`"))
             .transpose()?)
@@ -74,28 +81,38 @@ impl StorageBackend for RedisStorage {
     async fn set(&mut self, key: &Key, value: ContentItem) -> Result<()> {
         let mut connection = self.connection().await?;
 
-        let item = serialize(&value).unwrap();
-        connection.set(key.as_ref(), item).await?;
+        let item = serialize(&value).wrap_err("failed to serialize item in `set`")?;
+        connection
+            .set(key.as_ref(), item)
+            .await
+            .wrap_err("failed to set item via Redis?")?;
+
         Ok(())
     }
 
     async fn get_all(&self) -> Result<std::collections::HashMap<Key, ContentItem>> {
         let mut connection = self.connection().await?;
 
-        let keys: Vec<String> = connection.keys("*").await?;
+        let keys: Vec<String> = connection
+            .keys("*")
+            .await
+            .wrap_err("failed to get keys from Redis")?;
+
         let mut items = std::collections::HashMap::new();
         for key in keys {
-            let item: Option<Vec<u8>> = connection.get(&key).await?;
-            if let Some(item) = item {
-                let item: ContentItem =
-                    deserialize(&item).wrap_err("failed to deserialize item in `get_all`")?;
+            let item = connection
+                .get::<_, Option<Vec<u8>>>(&key).await
+                .wrap_err_with(|| format!("failed to get item from Redis by key `{key}`"))?
+                .ok_or_else(|| eyre!("failed to get item from Redis by key that Redis provided. Most likely we've encountered a race here"))?;
 
-                if item.is_read() {
-                    continue;
-                }
+            let item: ContentItem =
+                deserialize(&item).wrap_err("failed to deserialize item in `get_all`")?;
 
-                items.insert(Key(key), item);
+            if item.is_read() {
+                continue;
             }
+
+            items.insert(Key(key), item);
         }
         Ok(items)
     }
@@ -145,20 +162,18 @@ impl StorageBackend for RedisStorage {
             debug!("got following random key: {key:?}");
 
             if let Some(key) = key {
-                let item: Option<Vec<u8>> = connection
-                    .get(&key)
-                    .await
-                    .wrap_err_with(|| format!("random key {key:?} doesn't exist!"))?;
-                if let Some(item) = item {
-                    let item: ContentItem = deserialize(&item)
-                        .wrap_err("failed to deserialize item in `get_random`")?;
+                let item: Vec<u8> = connection
+                    .get::<_, Option<Vec<u8>>>(&key)
+                    .await?
+                    .ok_or_else(|| eyre!("key {key:?} got from RANDOMKEY doesn't exist! Most likely we've encountered a race here"))?;
+                let item: ContentItem =
+                    deserialize(&item).wrap_err("failed to deserialize item in `get_random`")?;
 
-                    if item.is_read() {
-                        continue;
-                    }
-
-                    return Ok(Some((key.into(), item)));
+                if item.is_read() {
+                    continue;
                 }
+
+                return Ok(Some((key.into(), item)));
             } else {
                 return Ok(None);
             }

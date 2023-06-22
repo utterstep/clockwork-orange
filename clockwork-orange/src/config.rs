@@ -1,7 +1,8 @@
-use std::{ops::Deref, sync::Arc};
+use std::{net::SocketAddr, ops::Deref, sync::Arc};
 
 use color_eyre::Result;
 use serde::{Deserialize, Serialize};
+use url::Url;
 
 #[non_exhaustive]
 #[derive(Debug, Clone, Deserialize, Serialize)]
@@ -26,6 +27,8 @@ pub struct ConfigInner {
     pub storage: StorageKind,
     pub bot_mode: BotMode,
     pub redis_url: Option<String>,
+    pub bind_to: SocketAddr,
+    pub webhook_url: Url,
 }
 
 #[derive(Debug, Clone)]
