@@ -81,14 +81,13 @@ pub trait StorageBackend: Send + Sync + Clone + std::fmt::Debug {
 
     /// Mark item as "read" – user has seen it and wants to remove it from his queue
     async fn mark_as_read(&mut self, key: &Key) -> Result<()> {
-        let mut item = self.get(key).await?;
+        let mut item = self
+            .get(key)
+            .await?
+            .ok_or_else(|| eyre!("Item not found"))?;
 
-        if let Some(item) = &mut item {
-            item.set_read(self.get_now().await?);
-            self.set(key, item.clone()).await?;
-        } else {
-            return Err(eyre!("Item not found"));
-        }
+        item.set_read(self.get_now().await?);
+        self.set(key, item.clone()).await?;
 
         Ok(())
     }

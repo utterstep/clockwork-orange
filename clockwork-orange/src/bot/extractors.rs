@@ -2,6 +2,7 @@ use teloxide::types::{CallbackQuery, MediaKind, MediaText, Message, MessageKind,
 
 use super::callbacks::Callback;
 
+/// Extract author from Message
 pub(super) fn get_message_author(msg: Message) -> Option<User> {
     if let MessageKind::Common(msg) = msg.kind {
         return msg.from;
@@ -10,6 +11,7 @@ pub(super) fn get_message_author(msg: Message) -> Option<User> {
     None
 }
 
+/// Extract message text from Message
 pub(super) fn get_message_text(msg: Message) -> Option<MediaText> {
     if let MessageKind::Common(msg) = msg.kind {
         if let MediaKind::Text(text) = msg.media_kind {
@@ -20,6 +22,7 @@ pub(super) fn get_message_text(msg: Message) -> Option<MediaText> {
     None
 }
 
+/// Extract callback data from CallbackQuery
 pub(super) fn get_callback_data(query: CallbackQuery) -> Option<Callback> {
     Callback::from_payload(&query.data?)
 }

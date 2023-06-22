@@ -1,3 +1,4 @@
+use color_eyre::eyre::WrapErr;
 use log::{debug, info};
 use teloxide::{
     error_handlers::LoggingErrorHandler,
@@ -58,11 +59,12 @@ async fn main() -> color_eyre::Result<()> {
                 bot,
                 Options::new(
                     // FIXME: specify this in config
-                    "0.0.0.0:8080".parse().unwrap(),
-                    "https://clockwork.utterstep.app/webhooks/".parse().unwrap(),
+                    config.bind_to,
+                    config.webhook_url.clone(),
                 ),
             )
-            .await?;
+            .await
+            .wrap_err("Failed to create webhook listener")?;
 
             dispatcher
                 .dispatch_with_listener(listener, error_handler)

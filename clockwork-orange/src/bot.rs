@@ -34,7 +34,9 @@ pub type Dispatcher<'a> = TgDispatcher<Bot, Report, DefaultKey>;
 
 pub async fn create_bot() -> Result<Bot> {
     let bot = TgBot::from_env().parse_mode(ParseMode::MarkdownV2);
-    bot.set_my_commands(Command::bot_commands()).await?;
+    bot.set_my_commands(Command::bot_commands())
+        .await
+        .wrap_err("Failed to set bot commands")?;
 
     Ok(bot)
 }
@@ -43,7 +45,7 @@ pub async fn create_bot_and_dispatcher<B: StorageBackend + Debug + 'static>(
     storage: Storage<B>,
     config: &Config,
 ) -> Result<(Bot, Dispatcher)> {
-    let bot = create_bot().await?;
+    let bot = create_bot().await.wrap_err("Failed to create bot")?;
 
     let handler = dptree::entry()
         // generic Command handler
