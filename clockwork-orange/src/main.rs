@@ -1,12 +1,4 @@
-use color_eyre::eyre::WrapErr;
 use log::{debug, info};
-use teloxide::{
-    error_handlers::LoggingErrorHandler,
-    update_listeners::{
-        polling_default,
-        webhooks::{self, Options},
-    },
-};
 
 use crate::{
     config::{BotMode, Config, StorageKind},
@@ -16,6 +8,7 @@ use crate::{
 mod bot;
 mod config;
 mod content_item;
+mod listeners;
 mod storage;
 
 #[tokio::main]
@@ -26,10 +19,11 @@ async fn main() -> color_eyre::Result<()> {
 
     let config = Config::from_env()?;
 
-    let (bot, mut dispatcher) = match config.storage {
+    let (bot, dispatcher) = match config.storage {
         StorageKind::InMemory => {
             info!("Creating bot with in-memory storage");
             let storage = MemoryStorage::new().into_storage();
+
             bot::create_bot_and_dispatcher(storage, &config).await?
         }
         StorageKind::Redis => {
@@ -42,33 +36,12 @@ async fn main() -> color_eyre::Result<()> {
     };
     debug!("Bot created");
 
-    let error_handler = LoggingErrorHandler::new();
-
     match config.bot_mode {
         BotMode::Polling => {
-            info!("Starting bot in polling mode");
-            let listener = polling_default(bot).await;
-
-            dispatcher
-                .dispatch_with_listener(listener, error_handler)
-                .await;
+            listeners::start_polling(dispatcher, bot).await?;
         }
         BotMode::Webhook => {
-            info!("Starting bot in webhook mode");
-            let listener = webhooks::axum(
-                bot,
-                Options::new(
-                    // FIXME: specify this in config
-                    config.bind_to,
-                    config.webhook_url.clone(),
-                ),
-            )
-            .await
-            .wrap_err("Failed to create webhook listener")?;
-
-            dispatcher
-                .dispatch_with_listener(listener, error_handler)
-                .await;
+            listeners::start_webhook(dispatcher, bot, &config).await?;
         }
     }
 

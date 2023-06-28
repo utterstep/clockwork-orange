@@ -5,6 +5,7 @@ use color_eyre::{
     eyre::{eyre, Context},
     Result,
 };
+use log::info;
 use teloxide::{
     requests::Requester,
     types::{CallbackQuery, ChatAction, MediaText, Message, Update, User},
@@ -29,6 +30,8 @@ pub async fn handle_command<B: StorageBackend + Debug>(
         .username
         .clone()
         .unwrap_or_else(|| author.id.to_string());
+
+    info!("Got command {command:?} from @{author}");
 
     match command {
         Command::Start => {

@@ -12,3 +12,17 @@ primary_region = "waw"
   auto_stop_machines = true
   auto_start_machines = true
   min_machines_running = 1
+
+  [[http_service.checks]]
+    grace_period = "2s"
+    interval = "1s"
+    method = "GET"
+    timeout = "300ms"
+    path = "/health"
+
+[env]
+  STORAGE = "redis"
+  BOT_MODE = "polling"
+  BIND_TO = "0.0.0.0:8080"
+  WEBHOOK_URL = "https://clockwork.utterstep.app/webhooks/"
+  RUST_LOG = "debug"
