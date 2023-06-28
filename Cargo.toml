@@ -7,3 +7,4 @@ members = [
 [workspace.package]
 version = "0.1.0"
 authors = ["Vlad Stepanov <me@utterstep.dev>"]
+repository = "https://github.com/utterstep/clockwork-orange/"
