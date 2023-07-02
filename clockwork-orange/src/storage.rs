@@ -107,4 +107,7 @@ pub trait StorageBackend: Send + Sync + Clone + std::fmt::Debug {
             .expect("this should never happen, but it did");
         Ok(Some((key.clone(), item.clone())))
     }
+
+    /// Check that storage is live and can be used
+    async fn health_check(&self) -> Result<()>;
 }

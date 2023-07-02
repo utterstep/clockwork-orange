@@ -58,6 +58,10 @@ impl StorageBackend for MemoryStorage {
         self.items().await.remove(key);
         Ok(())
     }
+
+    async fn health_check(&self) -> Result<()> {
+        Ok(())
+    }
 }
 
 #[cfg(test)]
