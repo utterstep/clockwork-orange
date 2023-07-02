@@ -179,4 +179,15 @@ impl StorageBackend for RedisStorage {
             }
         }
     }
+
+    async fn health_check(&self) -> Result<()> {
+        let mut connection = self.connection().await?;
+
+        let _: String = redis::cmd("PING")
+            .query_async(&mut connection)
+            .await
+            .wrap_err("failed to ping Redis")?;
+
+        Ok(())
+    }
 }
