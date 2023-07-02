@@ -22,7 +22,7 @@ primary_region = "waw"
 
 [env]
   STORAGE = "redis"
-  BOT_MODE = "polling"
+  BOT_MODE = "webhook"
   BIND_TO = "0.0.0.0:8080"
   WEBHOOK_URL = "https://clockwork.utterstep.app/webhooks/"
   RUST_LOG = "debug"
