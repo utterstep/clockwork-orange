@@ -96,7 +96,7 @@ pub fn tg_escape(text: &str) -> String {
     // to debug: replace this with just `res` and `self::tests::test_nausicaa` will fail
     TG_DOUBLE_QUOTATION_REGEX
         .replace_all(&res, "\\$1")
-        .into_owned()
+        .replace('>', "\\>")
 }
 
 #[cfg(test)]
@@ -133,5 +133,13 @@ mod tests {
             ),
             r#"https://en\.wikipedia\.org/wiki/Nausica%C3%A4\_of\_the\_Valley\_of\_the\_Wind\_\(film\)"#
         );
+    }
+
+    #[test]
+    fn test_md_quotes() {
+        assert_eq!(
+            tg_escape("Мне понравился вот такой отзыв:\n> Я в восторге!"),
+            "Мне понравился вот такой отзыв:\n\n \\> \n \\> Я в восторге\\!"
+        )
     }
 }
