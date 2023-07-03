@@ -8,7 +8,7 @@ use color_eyre::{
 use log::info;
 use teloxide::{
     requests::Requester,
-    types::{CallbackQuery, ChatAction, MediaText, Message, Update, User},
+    types::{CallbackQuery, ChatAction, Me, MediaText, Message, MessageKind, Update, User},
 };
 
 use crate::{
@@ -169,6 +169,7 @@ pub async fn handle_callback<B: StorageBackend>(
 
 pub async fn add_new_entry<B: StorageBackend>(
     bot: Bot,
+    me: Me,
     mut storage: Storage<B>,
     msg: Message,
     author: User,
@@ -176,6 +177,22 @@ pub async fn add_new_entry<B: StorageBackend>(
 ) -> Result<()> {
     let chat_id = msg.chat.id;
     let author = author.username.unwrap_or_else(|| author.id.to_string());
+
+    // check if user is replying to someone else's message
+    match msg.reply_to_message() {
+        None => {}
+        Some(msg) => {
+            if let MessageKind::Common(msg) = &msg.kind {
+                if let Some(user) = &msg.from {
+                    if user.id != me.id {
+                        info!("User is replying to someone else's message, ignoring");
+
+                        return Ok(());
+                    }
+                }
+            }
+        }
+    }
 
     let content_item = ContentItem::new(author, text.text);
     storage
