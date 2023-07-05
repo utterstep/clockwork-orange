@@ -1,5 +1,5 @@
-use log::debug;
 use teloxide::types::InlineKeyboardButton;
+use tracing::debug;
 
 use crate::storage::Key;
 

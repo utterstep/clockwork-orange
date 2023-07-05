@@ -8,6 +8,8 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+clockwork-orange-messages = { path = "../clockwork-orange-messages" }
+
 axum = "0.6.18"
 anyhow = "1.0.71"
 async-trait = "0.1.68"
@@ -17,14 +19,13 @@ dotenvy = "0.15.7"
 dptree = "0.3.0"
 envy = "0.4.2"
 indoc = "2.0.1"
-log = "0.4.19"
-pretty_env_logger = "0.5.0"
 rand = "0.8.5"
 redis = { version = "0.23.0", default-features = false, features = ["acl", "aio", "tokio-comp"] }
 serde = { version = "1.0.164", features = ["derive"] }
 teloxide = { version = "0.12.2", default-features = false, features = ["auto-send", "ctrlc_handler", "rustls", "macros", "webhooks-axum", "throttle"] }
 time = { version = "0.3.22", features = ["serde"] }
 tokio = { version = "1.28.2", features = ["full"] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.17", features = ["env-filter", "parking_lot"] }
 url = { version = "2.4.0", features = ["serde"] }
-
-clockwork-orange-messages = { path = "../clockwork-orange-messages" }
+tracing-tree = "0.2.4"

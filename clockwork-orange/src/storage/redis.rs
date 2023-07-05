@@ -13,9 +13,9 @@ use color_eyre::{
     eyre::{eyre, WrapErr},
     Result,
 };
-use log::{debug, info};
 use redis::{aio::Connection, AsyncCommands, Client};
 use tokio::time::timeout;
+use tracing::{debug, info};
 
 use super::{ContentItem, Key, StorageBackend};
 
@@ -46,6 +46,7 @@ impl RedisStorage {
     /// Currently creates new connection every time.
     /// Huge performance impact, but for current state of having only 2 (two) users
     /// that's probably fine :)
+    #[tracing::instrument(skip(self))]
     async fn connection(&self) -> Result<Connection> {
         info!("Getting redis connection");
 
@@ -65,6 +66,7 @@ impl RedisStorage {
 
 #[async_trait::async_trait]
 impl StorageBackend for RedisStorage {
+    #[tracing::instrument(err, skip(self))]
     async fn get(&self, key: &Key) -> Result<Option<ContentItem>> {
         let mut connection = self.connection().await?;
 
@@ -78,6 +80,7 @@ impl StorageBackend for RedisStorage {
             .transpose()?)
     }
 
+    #[tracing::instrument(err, skip(self, value))]
     async fn set(&mut self, key: &Key, value: ContentItem) -> Result<()> {
         let mut connection = self.connection().await?;
 
@@ -90,6 +93,7 @@ impl StorageBackend for RedisStorage {
         Ok(())
     }
 
+    #[tracing::instrument(err, skip(self))]
     async fn get_all(&self) -> Result<std::collections::HashMap<Key, ContentItem>> {
         let mut connection = self.connection().await?;
 
@@ -117,6 +121,7 @@ impl StorageBackend for RedisStorage {
         Ok(items)
     }
 
+    #[tracing::instrument(err, skip(self))]
     async fn get_user_items(
         &self,
         user: &str,
@@ -128,6 +133,7 @@ impl StorageBackend for RedisStorage {
         Ok(map)
     }
 
+    #[tracing::instrument(err, ret, skip(self))]
     async fn get_now(&self) -> Result<time::OffsetDateTime> {
         let mut connection = self.connection().await?;
 
@@ -139,6 +145,7 @@ impl StorageBackend for RedisStorage {
         Ok(time::OffsetDateTime::from_unix_timestamp(seconds)?)
     }
 
+    #[tracing::instrument(err, skip(self))]
     async fn delete(&mut self, key: &Key) -> Result<()> {
         let mut connection = self.connection().await?;
 
@@ -149,6 +156,7 @@ impl StorageBackend for RedisStorage {
         Ok(())
     }
 
+    #[tracing::instrument(fields(random_key), err, skip(self))]
     async fn get_random(&self) -> Result<Option<(Key, ContentItem)>> {
         let mut connection = self.connection().await?;
 
@@ -162,6 +170,8 @@ impl StorageBackend for RedisStorage {
             debug!("got following random key: {key:?}");
 
             if let Some(key) = key {
+                tracing::Span::current().record("random_key", &key);
+
                 let item: Vec<u8> = connection
                     .get::<_, Option<Vec<u8>>>(&key)
                     .await?
@@ -180,6 +190,7 @@ impl StorageBackend for RedisStorage {
         }
     }
 
+    #[tracing::instrument(err, skip(self))]
     async fn health_check(&self) -> Result<()> {
         let mut connection = self.connection().await?;
 

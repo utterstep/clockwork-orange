@@ -2,7 +2,6 @@ use std::fmt::Debug;
 
 use axum::{extract::State, response::Response, routing::get, Router};
 use color_eyre::{eyre::WrapErr, Result};
-use log::info;
 use teloxide::{
     dispatching::update_listeners::{
         polling_default,
@@ -12,6 +11,7 @@ use teloxide::{
     requests::Requester,
     update_listeners::UpdateListener,
 };
+use tracing::info;
 
 use crate::{
     bot::Dispatcher,

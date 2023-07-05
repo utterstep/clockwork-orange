@@ -1,4 +1,6 @@
-use log::{debug, info};
+use tracing::{debug, info};
+use tracing_subscriber::{layer::SubscriberExt, registry::Registry};
+use tracing_tree::HierarchicalLayer;
 
 use crate::{
     config::{BotMode, Config, StorageKind},
@@ -14,8 +16,14 @@ mod storage;
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
-    pretty_env_logger::init();
-    dotenvy::dotenv().ok();
+
+    let layer = HierarchicalLayer::default()
+        .with_indent_lines(true)
+        .with_bracketed_fields(true)
+        .with_thread_ids(true);
+
+    let subscriber = Registry::default().with(layer);
+    tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let config = Config::from_env()?;
 
