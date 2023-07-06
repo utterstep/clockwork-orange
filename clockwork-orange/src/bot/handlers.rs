@@ -5,11 +5,11 @@ use color_eyre::{
     eyre::{eyre, Context},
     Result,
 };
-use log::info;
 use teloxide::{
     requests::Requester,
     types::{CallbackQuery, ChatAction, Me, MediaText, Message, MessageKind, Update, User},
 };
+use tracing::info;
 
 use crate::{
     content_item::ContentItem,

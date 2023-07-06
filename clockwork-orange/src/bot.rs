@@ -81,6 +81,7 @@ pub async fn create_bot_and_dispatcher<B: StorageBackend + Debug + 'static>(
 }
 
 /// Send a message to chat, with a button to mark the item as watched
+#[tracing::instrument(skip(requester, item))]
 pub(self) async fn send_item_to_chat<R>(
     requester: R,
     item: &ContentItem,

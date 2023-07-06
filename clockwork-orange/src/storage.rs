@@ -65,6 +65,7 @@ pub trait StorageBackend: Send + Sync + Clone + std::fmt::Debug {
     async fn get_all(&self) -> Result<HashMap<Key, ContentItem>>;
 
     /// Get items which this user has added
+    #[tracing::instrument(err, skip(self))]
     async fn get_user_items(&self, user: &str) -> Result<HashMap<Key, ContentItem>> {
         let mut map = self.get_all().await?;
         map.retain(|_, item| item.author() == user);
@@ -80,6 +81,7 @@ pub trait StorageBackend: Send + Sync + Clone + std::fmt::Debug {
     async fn delete(&mut self, key: &Key) -> Result<()>;
 
     /// Mark item as "read" – user has seen it and wants to remove it from his queue
+    #[tracing::instrument(err, skip(self))]
     async fn mark_as_read(&mut self, key: &Key) -> Result<()> {
         let mut item = self
             .get(key)
@@ -93,6 +95,7 @@ pub trait StorageBackend: Send + Sync + Clone + std::fmt::Debug {
     }
 
     /// Get random unread item from storage
+    #[tracing::instrument(fields(random_key), err, skip(self))]
     async fn get_random(&self) -> Result<Option<(Key, ContentItem)>> {
         let items = self.get_all().await?;
         let mut rng = rand::thread_rng();
@@ -105,6 +108,7 @@ pub trait StorageBackend: Send + Sync + Clone + std::fmt::Debug {
             .iter()
             .nth(index)
             .expect("this should never happen, but it did");
+        tracing::Span::current().record("random_key", &key.0);
         Ok(Some((key.clone(), item.clone())))
     }
 
