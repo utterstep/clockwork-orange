@@ -1,5 +1,5 @@
 use tracing::{debug, info};
-use tracing_subscriber::{layer::SubscriberExt, registry::Registry};
+use tracing_subscriber::{layer::SubscriberExt, registry::Registry, EnvFilter};
 use tracing_tree::HierarchicalLayer;
 
 use crate::{
@@ -22,7 +22,9 @@ async fn main() -> color_eyre::Result<()> {
         .with_bracketed_fields(true)
         .with_thread_ids(true);
 
-    let subscriber = Registry::default().with(layer);
+    let subscriber = Registry::default()
+        .with(layer)
+        .with(EnvFilter::from_default_env());
     tracing::subscriber::set_global_default(subscriber).unwrap();
 
     let config = Config::from_env()?;
