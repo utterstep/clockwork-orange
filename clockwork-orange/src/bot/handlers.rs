@@ -18,6 +18,10 @@ use crate::{
 
 use super::{callbacks::Callback, send_item_to_chat, Bot, Command};
 
+#[tracing::instrument(
+    skip(bot, storage, msg, author),
+    fields(chat_id = msg.chat.id.0, author = author.id.0),
+)]
 pub async fn handle_command<B: StorageBackend + Debug>(
     bot: Bot,
     storage: Storage<B>,
